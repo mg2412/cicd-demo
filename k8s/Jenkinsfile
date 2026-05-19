@@ -1,0 +1,43 @@
+pipeline {
+
+    agent any
+
+    environment {
+        IMAGE_NAME = "mg2412/flask-app"
+        DOCKER_CREDS = credentials('dockerhub-creds')
+    }
+
+    stages {
+
+        stage('Clone Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/mg2412/cicd-demo.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE_NAME:latest .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh 'echo $DOCKER_CREDS_PSW | docker login -u $DOCKER_CREDS_USR --password-stdin'
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                sed -i "s|mg2412/flask-app:latest|$IMAGE_NAME:latest|g" k8s/deployments.yaml
+
+                kubectl apply -f k8s/deployments.yaml
+                kubectl apply -f k8s/service.yaml
+                '''
+            }
+        }
+    }
+}
